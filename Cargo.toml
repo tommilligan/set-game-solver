@@ -1,0 +1,12 @@
+[package]
+name = "set-game-solver"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+once_cell = "1.9.0"
+pretty_assertions = "1.1.0"
+rand = "0.8.5"
+rand_pcg = "0.3.1"
+strum = "0.24.0"
+strum_macros = "0.24.0"
