@@ -8,7 +8,7 @@ const RANK_COLOR: u8 = RANK_BASE.pow(3);
 const RANK_COUNT: u8 = RANK_BASE.pow(2);
 const RANK_SHADE: u8 = RANK_BASE.pow(1);
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy, Eq, PartialOrd, Ord)]
 pub struct Card(u8);
 
 impl std::ops::Add for Card {
@@ -108,6 +108,7 @@ pub enum Shape {
 pub static DECK: Lazy<Vec<Card>> = Lazy::new(|| (0..DECK_SIZE).map(Card).collect());
 
 /// A selection of three cards.
+#[derive(Debug, PartialEq, Clone)]
 pub struct Triple {
     cards: (Card, Card, Card),
 }
@@ -122,7 +123,10 @@ impl Triple {
     /// Return whether the three given cards are a set.
     pub fn is_set(&self) -> bool {
         let (a, b, c) = &self.cards;
-        unimplemented!()
+        let mut cards = [a, b, c];
+        cards.sort();
+        let [a, b, c] = cards;
+        *a - *b == *b - *c
     }
 }
 
@@ -241,89 +245,98 @@ mod tests {
         }
     }
 
-    /*
-        const RED_ONE_SOLID_DIAMOND: Card = Card {
-            color: Color::Red,
-            count: Count::One,
-            shade: Shade::Solid,
-            shape: Shape::Diamond,
-        };
-        const GREEN_TWO_SOLID_DIAMOND: Card = Card {
-            color: Color::Green,
-            count: Count::Two,
-            shade: Shade::Solid,
-            shape: Shape::Diamond,
-        };
-        const PURPLE_THREE_SOLID_DIAMOND: Card = Card {
-            color: Color::Purple,
-            count: Count::Three,
-            shade: Shade::Solid,
-            shape: Shape::Diamond,
-        };
-        const GREEN_TWO_STRIPED_OVAL: Card = Card {
-            color: Color::Green,
-            count: Count::Two,
-            shade: Shade::Striped,
-            shape: Shape::Oval,
-        };
-        const PURPLE_THREE_OPEN_SQUIGGLE: Card = Card {
-            color: Color::Purple,
-            count: Count::Three,
-            shade: Shade::Open,
-            shape: Shape::Squiggle,
-        };
+    const RED_ONE_SOLID_DIAMOND: Card = Card(0);
+    const GREEN_TWO_SOLID_DIAMOND: Card = Card(36);
+    const PURPLE_THREE_SOLID_DIAMOND: Card = Card(72);
+    const GREEN_TWO_STRIPED_OVAL: Card = Card(40);
+    const PURPLE_THREE_OPEN_SQUIGGLE: Card = Card(80);
 
-        #[test]
-        fn is_set_works() {
-            // All the same card is tecnically a set
-            assert_eq!(
-                Triple::from((
-                    RED_ONE_SOLID_DIAMOND.clone(),
-                    RED_ONE_SOLID_DIAMOND.clone(),
-                    RED_ONE_SOLID_DIAMOND.clone(),
-                ))
-                .is_set(),
-                true
-            );
-            // A mixed set
-            assert_eq!(
-                Triple::from((
-                    RED_ONE_SOLID_DIAMOND.clone(),
-                    GREEN_TWO_SOLID_DIAMOND.clone(),
-                    PURPLE_THREE_SOLID_DIAMOND.clone(),
-                ))
-                .is_set(),
-                true
-            );
-            // All different set
-            assert_eq!(
-                Triple::from((
-                    RED_ONE_SOLID_DIAMOND.clone(),
-                    GREEN_TWO_STRIPED_OVAL.clone(),
-                    PURPLE_THREE_OPEN_SQUIGGLE.clone(),
-                ))
-                .is_set(),
-                true
-            );
-            // Not sets
-            assert_eq!(
-                Triple::from((
-                    RED_ONE_SOLID_DIAMOND.clone(),
-                    RED_ONE_SOLID_DIAMOND.clone(),
-                    PURPLE_THREE_SOLID_DIAMOND.clone(),
-                ))
-                .is_set(),
-                false
-            );
-            assert_eq!(
-                Triple::from((
-                    RED_ONE_SOLID_DIAMOND.clone(),
-                    GREEN_TWO_SOLID_DIAMOND.clone(),
-                    PURPLE_THREE_OPEN_SQUIGGLE.clone(),
-                ))
-                .is_set(),
-                false
-            );
+    trait TripleExt {
+        /// Return all permutations of the triple
+        fn permutations(&self) -> Box<dyn Iterator<Item = Self>>;
+    }
+
+    impl TripleExt for Triple {
+        fn permutations(&self) -> Box<dyn Iterator<Item = Self>> {
+            use itertools::Itertools;
+
+            let (a, b, c) = self.cards.clone();
+            Box::new(
+                [a, b, c]
+                    .into_iter()
+                    .permutations(3)
+                    .map(|cards| Triple::from((cards[0], cards[1], cards[2]))),
+            )
         }
-    */
+    }
+
+    #[test]
+    fn triple_permutations() {
+        let expected = vec![
+            Triple::from((Card(0), Card(1), Card(2))),
+            Triple::from((Card(0), Card(2), Card(1))),
+            Triple::from((Card(1), Card(0), Card(2))),
+            Triple::from((Card(1), Card(2), Card(0))),
+            Triple::from((Card(2), Card(0), Card(1))),
+            Triple::from((Card(2), Card(1), Card(0))),
+        ];
+        let actual: Vec<_> = Triple::from((Card(0), Card(1), Card(2)))
+            .permutations()
+            .collect();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn is_set_works() {
+        fn assert_all_permutations_is_set(triple: Triple, is_set: bool) {
+            for triple in triple.permutations() {
+                assert_eq!(triple.is_set(), is_set);
+            }
+        }
+
+        // All the same card is tecnically a set
+        assert_all_permutations_is_set(
+            Triple::from((
+                RED_ONE_SOLID_DIAMOND.clone(),
+                RED_ONE_SOLID_DIAMOND.clone(),
+                RED_ONE_SOLID_DIAMOND.clone(),
+            )),
+            true,
+        );
+        // A mixed set
+        assert_all_permutations_is_set(
+            Triple::from((
+                GREEN_TWO_SOLID_DIAMOND.clone(),
+                RED_ONE_SOLID_DIAMOND.clone(),
+                PURPLE_THREE_SOLID_DIAMOND.clone(),
+            )),
+            true,
+        );
+        // All different set
+        assert_all_permutations_is_set(
+            Triple::from((
+                RED_ONE_SOLID_DIAMOND.clone(),
+                GREEN_TWO_STRIPED_OVAL.clone(),
+                PURPLE_THREE_OPEN_SQUIGGLE.clone(),
+            )),
+            true,
+        );
+        // Not sets
+        assert_all_permutations_is_set(
+            Triple::from((
+                RED_ONE_SOLID_DIAMOND.clone(),
+                RED_ONE_SOLID_DIAMOND.clone(),
+                PURPLE_THREE_SOLID_DIAMOND.clone(),
+            )),
+            false,
+        );
+        assert_all_permutations_is_set(
+            Triple::from((
+                RED_ONE_SOLID_DIAMOND.clone(),
+                GREEN_TWO_SOLID_DIAMOND.clone(),
+                PURPLE_THREE_OPEN_SQUIGGLE.clone(),
+            )),
+            false,
+        );
+    }
 }

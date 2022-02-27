@@ -302,15 +302,42 @@ This allows us to remove `strum` and the `EnumIter` stuff we needed earlier.
 We can rename our original struct `CardProperties`. We should also allow converting from `Card` to `CardProperties` and back, as they're equivalent:
 
 ```rust
+const RANK_BASE: u8 = 3;
+const RANK_COLOR: u8 = RANK_BASE.pow(3);
+const RANK_COUNT: u8 = RANK_BASE.pow(2);
+const RANK_SHADE: u8 = RANK_BASE.pow(1);
+
 impl From<CardProperties> for Card {
     fn from(properties: CardProperties) -> Self {
-        unimplemented!()
+        let CardProperties {
+            color,
+            count,
+            shade,
+            shape,
+        } = properties;
+        Self(
+            (color.to_u8().expect("color did not fit in u8") * RANK_COLOR)
+                + (count.to_u8().expect("count did not fit in u8") * RANK_COUNT)
+                + (shade.to_u8().expect("shade did not fit in u8") * RANK_SHADE)
+                + shape.to_u8().expect("shape did not fit in u8"),
+        )
     }
 }
 
 impl From<Card> for CardProperties {
     fn from(card: Card) -> Self {
-        unimplemented!()
+        let color = Color::from_u8(card.0 / RANK_COLOR).expect("invalid color enum value");
+        let remainder = card.0 % RANK_COLOR;
+        let count = Count::from_u8(remainder / RANK_COUNT).expect("invalid count enum value");
+        let remainder = remainder % RANK_COUNT;
+        let shade = Shade::from_u8(remainder / RANK_SHADE).expect("invalid shade enum value");
+        let shape = Shape::from_u8(remainder % RANK_SHADE).expect("invalid shape enum value");
+        Self {
+            color,
+            count,
+            shade,
+            shape,
+        }
     }
 }
 
@@ -321,6 +348,55 @@ pub struct CardProperties {
     count: Count,
     shade: Shade,
     shape: Shape,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn card_into_properties() {
+        assert_eq!(
+            CardProperties::from(Card(0)),
+            CardProperties {
+                color: Color::Red,
+                count: Count::One,
+                shade: Shade::Solid,
+                shape: Shape::Diamond
+            }
+        );
+        assert_eq!(
+            CardProperties::from(Card(40)),
+            CardProperties {
+                color: Color::Green,
+                count: Count::Two,
+                shade: Shade::Striped,
+                shape: Shape::Squiggle
+            }
+        );
+        assert_eq!(
+            CardProperties::from(Card(80)),
+            CardProperties {
+                color: Color::Purple,
+                count: Count::Three,
+                shade: Shade::Open,
+                shape: Shape::Oval
+            }
+        );
+    }
+
+    #[test]
+    fn card_properties_roundtrip_exhaustive() {
+        for card in DECK.iter() {
+            let result = std::panic::catch_unwind(|| {
+                assert_eq!(Card::from(CardProperties::from(card.clone())), card.clone());
+            });
+            if result.is_err() {
+                panic!("card properties roundtrip panicked on '{card:?}'");
+            }
+        }
+    }
 }
 ```
 
@@ -385,3 +461,20 @@ mod tests {
     }
 }
 ```
+
+We can now happily redefine what a set is!
+
+```rust
+impl Triple {
+    /// Return whether the three given cards are a set.
+    pub fn is_set(&self) -> bool {
+        let (a, b, c) = &self.cards;
+        let mut cards = [a, b, c];
+        cards.sort();
+        let [a, b, c] = cards;
+        *a - *b == *b - *c
+    }
+}
+```
+
+Simple!
