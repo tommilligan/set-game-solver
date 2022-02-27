@@ -7,6 +7,7 @@ use crossterm::{
 };
 use set_game_solver::{Card, Table};
 use std::{
+    borrow::Cow,
     error::Error,
     io,
     time::{Duration, Instant},
@@ -24,67 +25,72 @@ pub fn draw<B>(f: &mut Frame<B>, app: &mut App)
 where
     B: Backend,
 {
-    let chunks = Layout::default()
-        .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
-        .split(f.size());
-    draw_first_tab(f, app, chunks[1]);
-}
-
-fn draw_first_tab<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
-    let chunks = Layout::default()
+    const CARD_HEIGHT: u16 = 5;
+    let mut rows = Layout::default()
         .constraints(
             [
-                Constraint::Length(9),
-                Constraint::Min(8),
-                Constraint::Length(7),
+                Constraint::Length(CARD_HEIGHT),
+                Constraint::Length(CARD_HEIGHT),
+                Constraint::Length(CARD_HEIGHT),
+                Constraint::Min(0),
             ]
             .as_ref(),
         )
-        .split(area);
-    draw_text(f, chunks[0]);
+        .split(f.size());
+    rows.pop();
+    let mut card_tiles = Vec::new();
+    for row in rows.into_iter() {
+        const CARD_WIDTH: u16 = 12;
+        let mut columns = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(CARD_WIDTH),
+                Constraint::Length(CARD_WIDTH),
+                Constraint::Length(CARD_WIDTH),
+                Constraint::Length(CARD_WIDTH),
+                Constraint::Length(CARD_WIDTH),
+                Constraint::Length(CARD_WIDTH),
+                Constraint::Length(CARD_WIDTH),
+                Constraint::Min(0),
+            ])
+            .split(row);
+        columns.pop();
+        for column in columns.into_iter() {
+            card_tiles.push(column);
+        }
+    }
+    draw_cards(f, app, card_tiles);
 }
 
-fn draw_text<B>(f: &mut Frame<B>, area: Rect)
+fn draw_cards<B>(f: &mut Frame<B>, app: &mut App, tiles: Vec<Rect>)
 where
     B: Backend,
 {
-    let text = vec![
-        Spans::from("This is a paragraph with several lines. You can change style your text the way you want"),
-        Spans::from(""),
-        Spans::from(vec![
-            Span::from("For example: "),
-            Span::styled("under", Style::default().fg(Color::Red)),
-            Span::raw(" "),
-            Span::styled("the", Style::default().fg(Color::Green)),
-            Span::raw(" "),
-            Span::styled("rainbow", Style::default().fg(Color::Blue)),
-            Span::raw("."),
-        ]),
-        Spans::from(vec![
-            Span::raw("Oh and if you didn't "),
-            Span::styled("notice", Style::default().add_modifier(Modifier::ITALIC)),
-            Span::raw(" you can "),
-            Span::styled("automatically", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(" "),
-            Span::styled("wrap", Style::default().add_modifier(Modifier::REVERSED)),
-            Span::raw(" your "),
-            Span::styled("text", Style::default().add_modifier(Modifier::UNDERLINED)),
-            Span::raw(".")
-        ]),
-        Spans::from(
-            "One more thing is that it should display unicode characters: 10€"
-        ),
-    ];
+    let cards = app.cards.iter().map(Some).chain(std::iter::repeat(None));
+    for (i, (tile, card)) in tiles.into_iter().zip(cards).enumerate() {
+        draw_card(f, tile, card, format!("{}", i));
+    }
+}
+
+fn draw_card<B>(f: &mut Frame<B>, area: Rect, card: Option<&Card>, title: String)
+where
+    B: Backend,
+{
     let block = Block::default().borders(Borders::ALL).title(Span::styled(
-        "Footer",
+        title,
         Style::default()
             .fg(Color::Magenta)
             .add_modifier(Modifier::BOLD),
     ));
-    let paragraph = Paragraph::new(text).block(block).wrap(Wrap { trim: true });
+    let text = vec![Spans::from(vec![
+        Span::from("          "),
+        Span::from("   "),
+        Span::styled(
+            card.map(|card| card.to_string()).unwrap_or_default(),
+            Style::default().fg(Color::Red),
+        ),
+    ])];
+    let paragraph = Paragraph::new(text).block(block).wrap(Wrap { trim: false });
     f.render_widget(paragraph, area);
 }
 
@@ -99,8 +105,14 @@ pub struct App<'a> {
 
 impl<'a> App<'a> {
     pub fn new(seed: u64) -> App<'a> {
-        let table = Table::new_from_seed(seed);
-        let cards = Default::default();
+        let mut table = Table::new_from_seed(seed);
+        table.deal();
+        let mut board = table.board_mut();
+        match table.deal() {
+            Some(card) => board.push(card),
+            None => {}
+        };
+        let cards = table.board().clone();
         App {
             seed,
             cards,

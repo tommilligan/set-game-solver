@@ -201,6 +201,11 @@ impl Table {
     }
 
     /// Allow an external entity to manipulate the board.
+    pub fn board(&self) -> &Vec<Card> {
+        &self.board
+    }
+
+    /// Allow an external entity to manipulate the board.
     pub fn board_mut(&mut self) -> &mut Vec<Card> {
         &mut self.board
     }
