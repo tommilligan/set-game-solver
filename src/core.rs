@@ -71,52 +71,10 @@ impl From<Card> for CardProperties {
 /// Names drawn from https://en.wikipedia.org/wiki/Set_(card_game)
 #[derive(Debug, PartialEq, Clone)]
 pub struct CardProperties {
-    color: Color,
-    count: Count,
-    shade: Shade,
-    shape: Shape,
-}
-
-impl fmt::Display for CardProperties {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let CardProperties {
-            color,
-            count,
-            shade,
-            shape,
-        } = &self;
-        let symbol = match shape {
-            Shape::Diamond => match shade {
-                Shade::Solid => "\u{25C6}",
-                Shade::Striped => "\u{2B16}",
-                Shade::Open => "\u{25C7}",
-            },
-            Shape::Oval => match shade {
-                Shade::Solid => "\u{25CF}",
-                Shade::Striped => "\u{25D0}",
-                Shade::Open => "\u{25CB}",
-            },
-            Shape::Squiggle => match shade {
-                Shade::Solid => "\u{29D3}",
-                Shade::Striped => "\u{29D1}",
-                Shade::Open => "\u{22C8}",
-            },
-        };
-        let count = count.to_u8().expect("count to fit in u8");
-        let color = match color {
-            Color::Red => "R",
-            Color::Green => "G",
-            Color::Purple => "P",
-        };
-        let text = format!("| {count}{color}{symbol} |");
-        write!(f, "{}", text)
-    }
-}
-
-impl fmt::Display for Card {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", CardProperties::from(*self))
-    }
+    pub color: Color,
+    pub count: Count,
+    pub shade: Shade,
+    pub shape: Shape,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, FromPrimitive, ToPrimitive)]
@@ -173,22 +131,10 @@ impl Triple {
     }
 }
 
-/// The full game state.
-pub struct Table {
-    deck: Vec<Card>,
-    board: Vec<Card>,
-}
+pub struct Deck(pub Vec<Card>);
 
-impl Table {
-    /// Set up a new game, specifying the deck order.
-    pub fn new(deck: Vec<Card>) -> Self {
-        Self {
-            deck,
-            board: Vec::new(),
-        }
-    }
-
-    /// Helper for setting up a fresh board without listing the deck order.
+impl Deck {
+    /// Helper for setting up a fresh deck without listing the order.
     #[cfg(feature = "rand")]
     pub fn new_from_seed(seed: u64) -> Self {
         use rand::{seq::SliceRandom, SeedableRng};
@@ -197,22 +143,12 @@ impl Table {
         let mut deck: Vec<_> = DECK.clone();
         let mut rng = Pcg64::seed_from_u64(seed);
         deck.shuffle(&mut rng);
-        Self::new(deck)
-    }
-
-    /// Allow an external entity to manipulate the board.
-    pub fn board(&self) -> &Vec<Card> {
-        &self.board
-    }
-
-    /// Allow an external entity to manipulate the board.
-    pub fn board_mut(&mut self) -> &mut Vec<Card> {
-        &mut self.board
+        Self(deck)
     }
 
     /// Deal a single card from the deck.
     pub fn deal(&mut self) -> Option<Card> {
-        self.deck.pop()
+        self.0.pop()
     }
 }
 

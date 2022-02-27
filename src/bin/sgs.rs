@@ -5,7 +5,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use set_game_solver::{Card, Table};
+use set_game_solver::{Card, CardProperties, Color as CardColor, Count, Deck, Shade, Shape};
 use std::{
     borrow::Cow,
     error::Error,
@@ -32,6 +32,10 @@ where
                 Constraint::Length(CARD_HEIGHT),
                 Constraint::Length(CARD_HEIGHT),
                 Constraint::Length(CARD_HEIGHT),
+                Constraint::Length(CARD_HEIGHT),
+                Constraint::Length(CARD_HEIGHT),
+                Constraint::Length(CARD_HEIGHT),
+                Constraint::Length(CARD_HEIGHT),
                 Constraint::Min(0),
             ]
             .as_ref(),
@@ -44,10 +48,6 @@ where
         let mut columns = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(CARD_WIDTH),
-                Constraint::Length(CARD_WIDTH),
-                Constraint::Length(CARD_WIDTH),
-                Constraint::Length(CARD_WIDTH),
                 Constraint::Length(CARD_WIDTH),
                 Constraint::Length(CARD_WIDTH),
                 Constraint::Length(CARD_WIDTH),
@@ -85,13 +85,48 @@ where
     let text = vec![Spans::from(vec![
         Span::from("          "),
         Span::from("   "),
-        Span::styled(
-            card.map(|card| card.to_string()).unwrap_or_default(),
-            Style::default().fg(Color::Red),
-        ),
+        card.map(card_content_span)
+            .unwrap_or_else(|| Span::from("")),
     ])];
     let paragraph = Paragraph::new(text).block(block).wrap(Wrap { trim: false });
     f.render_widget(paragraph, area);
+}
+
+fn card_content_span(card: &Card) -> Span {
+    let CardProperties {
+        color,
+        count,
+        shade,
+        shape,
+    } = CardProperties::from(*card);
+    let symbol = match shape {
+        Shape::Diamond => match shade {
+            Shade::Solid => "\u{25C6}",
+            Shade::Striped => "\u{2B16}",
+            Shade::Open => "\u{25C7}",
+        },
+        Shape::Oval => match shade {
+            Shade::Solid => "\u{25CF}",
+            Shade::Striped => "\u{25D0}",
+            Shade::Open => "\u{25CB}",
+        },
+        Shape::Squiggle => match shade {
+            Shade::Solid => "\u{29D3}",
+            Shade::Striped => "\u{29D1}",
+            Shade::Open => "\u{22C8}",
+        },
+    };
+    let color = match color {
+        CardColor::Red => Color::Red,
+        CardColor::Green => Color::Green,
+        CardColor::Purple => Color::Magenta,
+    };
+    let text = match count {
+        Count::One => format!("{symbol}    "),
+        Count::Two => format!("{symbol} {symbol}  "),
+        Count::Three => format!("{symbol} {symbol} {symbol}"),
+    };
+    Span::styled(text, Style::default().fg(color))
 }
 
 pub struct App<'a> {
@@ -100,26 +135,26 @@ pub struct App<'a> {
     pub cards: Vec<Card>,
     pub selected_card: u8,
     pub should_quit: bool,
-    pub table: Table,
+    pub deck: Deck,
 }
 
 impl<'a> App<'a> {
     pub fn new(seed: u64) -> App<'a> {
-        let mut table = Table::new_from_seed(seed);
-        table.deal();
-        let mut board = table.board_mut();
-        match table.deal() {
-            Some(card) => board.push(card),
-            None => {}
-        };
-        let cards = table.board().clone();
+        let mut deck = Deck::new_from_seed(seed);
+        let mut cards: Vec<Card> = Default::default();
+        for _ in 0..12 {
+            match deck.deal() {
+                Some(card) => cards.push(card),
+                None => {}
+            };
+        }
         App {
             seed,
             cards,
             selected_card: 0,
             should_quit: false,
             title: "foo",
-            table,
+            deck,
         }
     }
 
