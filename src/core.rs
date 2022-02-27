@@ -189,6 +189,7 @@ impl Table {
     }
 
     /// Helper for setting up a fresh board without listing the deck order.
+    #[cfg(feature = "rand")]
     pub fn new_from_seed(seed: u64) -> Self {
         use rand::{seq::SliceRandom, SeedableRng};
         use rand_pcg::Pcg64;
