@@ -478,3 +478,9 @@ impl Triple {
 ```
 
 Simple!
+
+Let's more on to actually solving this problem we've created.
+
+### A brief aside: visualisation
+
+This math problem we've constructed is based on a visual game. Naturally, it might help a little to add some visualisation to our data.

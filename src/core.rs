@@ -1,6 +1,7 @@
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use once_cell::sync::Lazy;
+use std::fmt;
 
 pub const DECK_SIZE: u8 = 81;
 const RANK_BASE: u8 = 3;
@@ -74,6 +75,48 @@ pub struct CardProperties {
     count: Count,
     shade: Shade,
     shape: Shape,
+}
+
+impl fmt::Display for CardProperties {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let CardProperties {
+            color,
+            count,
+            shade,
+            shape,
+        } = &self;
+        let symbol = match shape {
+            Shape::Diamond => match shade {
+                Shade::Solid => "\u{25C6}",
+                Shade::Striped => "\u{2B16}",
+                Shade::Open => "\u{25C7}",
+            },
+            Shape::Oval => match shade {
+                Shade::Solid => "\u{25CF}",
+                Shade::Striped => "\u{25D0}",
+                Shade::Open => "\u{25CB}",
+            },
+            Shape::Squiggle => match shade {
+                Shade::Solid => "\u{29D3}",
+                Shade::Striped => "\u{29D1}",
+                Shade::Open => "\u{22C8}",
+            },
+        };
+        let count = count.to_u8().expect("count to fit in u8");
+        let color = match color {
+            Color::Red => "R",
+            Color::Green => "G",
+            Color::Purple => "P",
+        };
+        let text = format!("| {count}{color}{symbol} |");
+        write!(f, "{}", text)
+    }
+}
+
+impl fmt::Display for Card {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", CardProperties::from(*self))
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, FromPrimitive, ToPrimitive)]
@@ -171,6 +214,15 @@ impl Table {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn card_display() {
+        let mut buf = String::new();
+        for card in DECK.clone().into_iter() {
+            buf.push_str(&card.to_string());
+        }
+        panic!("{}", buf);
+    }
 
     #[test]
     fn card_add() {
