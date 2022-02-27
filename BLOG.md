@@ -6,6 +6,8 @@
 
 ## Let's write a solver!
 
+### Getting started
+
 I chose to write this solver in Rust - it's performant, clear, and most importantly, I like writing Rust code.
 
 Let's go ahead and set up the basics in a new project:
@@ -135,6 +137,8 @@ static DECK: Lazy<Vec<Card>> = Lazy::new(|| {
     deck
 });
 ```
+
+### Filling in the details
 
 It's now trivial to implement our `new_from_seed` method we specified earlier:
 
@@ -271,4 +275,113 @@ mv lib.rs core.rs
 ```rust
 // lib.rs
 mod core;
+```
+
+### So what was that better idea?
+
+This is already getting pretty wordy and unwieldy, for what _feels_ like should be a simple solution.
+
+Let's stop and think for a moment.
+
+#### Abstract math interlude
+
+#### So, let's change the internals
+
+First off, we can define our deck as a simple vector of integers:
+
+```rust
+#[derive(Debug, PartialEq, Clone)]
+pub struct Card(u8);
+
+/// A complete, ordered deck.
+pub static DECK: Lazy<Vec<Card>> = Lazy::new(|| (0..81).map(Card).collect());
+```
+
+This allows us to remove `strum` and the `EnumIter` stuff we needed earlier.
+
+We can rename our original struct `CardProperties`. We should also allow converting from `Card` to `CardProperties` and back, as they're equivalent:
+
+```rust
+impl From<CardProperties> for Card {
+    fn from(properties: CardProperties) -> Self {
+        unimplemented!()
+    }
+}
+
+impl From<Card> for CardProperties {
+    fn from(card: Card) -> Self {
+        unimplemented!()
+    }
+}
+
+/// Names drawn from https://en.wikipedia.org/wiki/Set_(card_game)
+#[derive(Debug, PartialEq, Clone)]
+pub struct CardProperties {
+    color: Color,
+    count: Count,
+    shade: Shade,
+    shape: Shape,
+}
+```
+
+We're also going to need to do some basic math with cards, so let's get that sorted:
+
+```rust
+impl std::ops::Add for Card {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self((self.0 + other.0).rem_euclid(DECK_SIZE))
+    }
+}
+
+impl std::ops::Sub for Card {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        Self(
+            (if self.0 < other.0 {
+                self.0 + DECK_SIZE
+            } else {
+                self.0
+            }) - other.0,
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn card_add() {
+        assert_eq!(Card(0) + Card(40), Card(40));
+        assert_eq!(Card(40) + Card(40), Card(80));
+        assert_eq!(Card(80) + Card(40), Card(39));
+        assert_eq!(Card(80) + Card(1), Card(0));
+    }
+
+    #[test]
+    fn card_sub() {
+        assert_eq!(Card(80) - Card(40), Card(40));
+        assert_eq!(Card(40) - Card(40), Card(0));
+        assert_eq!(Card(0) - Card(40), Card(41));
+        assert_eq!(Card(0) - Card(1), Card(80));
+    }
+
+    #[test]
+    fn card_sub_exhaustive() {
+        for a in 0..DECK_SIZE {
+            for b in 0..DECK_SIZE {
+                let result = std::panic::catch_unwind(|| {
+                    let _ = Card(a) - Card(b);
+                });
+                if result.is_err() {
+                    panic!("card subtraction paniced on '{a} - {b}'");
+                }
+            }
+        }
+    }
+}
 ```
